@@ -1,10 +1,9 @@
 import numpy as np
 import busio
-from board import SCL_1, SDA_1
-from adafruit_pca9685 import PCA9685
-from adafruit_motor import motor
+import board
+from adafruit_motorkit import MotorKit
 
-class MecanumDriver:
+class MecanumDriver_MotorKit:
     def __init__(self,
                  pca_frequency=1600,
                  whl_radius=0.02,
@@ -12,15 +11,14 @@ class MecanumDriver:
                  body_length=0.3,
                  wheel_base=0.2):
         print('INIT: creating i2c bus')
-        i2c_bus = busio.I2C(SCL_1,SDA_1)
-        pca = PCA9685(i2c_bus, address=0x60)
-        pca.frequency = pca_frequency
+        #self.kit = MotorKit(address=0x60,i2c=i2c_bus)
+        self.kit = MotorKit(i2c=board.I2C())
         
         print('INIT: creating motor objects')
-        self.motor1 = motor.DCMotor(pca.channels[9],pca.channels[10])
-        self.motor2 = motor.DCMotor(pca.channels[11],pca.channels[12])
-        self.motor3 = motor.DCMotor(pca.channels[3],pca.channels[4])
-        self.motor4 = motor.DCMotor(pca.channels[5],pca.channels[6])
+        self.motor1 = self.kit.motor1
+        self.motor2 = self.kit.motor2
+        self.motor3 = self.kit.motor3
+        self.motor4 = self.kit.motor4
 
         self.whl_radius = whl_radius
         self.max_whl_speed = max_whl_speed
@@ -69,8 +67,6 @@ class MecanumDriver:
 
     def _whl_speeds_to_throttle(self, whl_speeds):
         return np.clip(whl_speeds / self.max_whl_speed,-1,1)* np.array([1, -1, 1, -1])
-
-
 
 
 
