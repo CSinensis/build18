@@ -16,6 +16,13 @@ class MecanumDriver:
         self.max_whl_speed = max_whl_speed
         self.body_length = body_length
         self.wheel_base = wheel_base
+    
+    def test_spin(self,throttle_val):
+        self.kit.motor1.throttle = throttle_val
+        self.kit.motor2.throttle = throttle_val
+        self.kit.motor3.throttle = throttle_val
+        self.kit.motor4.throttle = throttle_val
+
 
     def send_action(self, action):
         throttles = self._whl_speeds_to_throttle(self._action_to_whl_speeds(action))
