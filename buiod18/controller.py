@@ -4,6 +4,7 @@ import cv2 as cv
 import matplotlib
 import matplotlib.pyplot as plt
 import time
+from CSI_interface import CSI_Camera, gstreamer_pipeline
 
 def now_ms():
     return time.time() * 1e-3
@@ -110,8 +111,8 @@ class Driver:
             mask = cv.inRange(hsv_img, color_threshold_low, color_threshold_high)
             masked_img = cv.bitwise_and(hsv_img, hsv_img, mask=mask)
             masked_img = cv.cvtColor(masked_img, cv.COLOR_HSV2RGB)
-            gray = cv.cvtColor(gray, cv.COLOR_RGB2GRAY)
-            contours,hierarchy = cv.findContours(gray,cv.RETR_EXTERNAL, 
+            gray_mask = cv.cvtColor(masked_img, cv.COLOR_RGB2GRAY)
+            contours,hierarchy = cv.findContours(gray_mask,cv.RETR_EXTERNAL, 
                                                  cv.CHAIN_APPROX_SIMPLE)
 
             cnt_area = []
@@ -122,8 +123,9 @@ class Driver:
             x,y,w,h = cv.boundingRect(contours[max_ind])
 
             centroids.append((x+w//2, y+h//2))
+        centroids = np.vstack(centroids)
         
-        true_centroid = (centroids[0]+centroids[1])/2
+        true_centroid = np.mean(centroids,axis=0)
         horz_dist = (imgL.shape[0] - true_centroid[0])
 
         heading = horz_dist / img_xlen * Driver.FOV
@@ -216,16 +218,52 @@ def send_action():
 if __name__ == "__main__":
 
     driver = Driver()
+    left_camera = CSI_Camera()
+    left_camera.open(
+        gstreamer_pipeline(
+            sensor_id=0,
+            capture_width=1920,
+            capture_height=1080,
+            flip_method=0,
+            display_width=960,
+            display_height=540,
+        )
+    )
+    left_camera.start()
 
-    while True:
-        try:
-            # TODO: capture images
-            imgL, imgR = None, None
+    right_camera = CSI_Camera()
+    right_camera.open(
+        gstreamer_pipeline(
+            sensor_id=1,
+            capture_width=1920,
+            capture_height=1080,
+            flip_method=0,
+            display_width=960,
+            display_height=540,
+        )
+    )
+    right_camera.start()
+    
+    if (left_camera.video_capture.isOpened() and right_camera.video_capture.isOpened()):
+	    try:
+	    	while True:
+	    	    # TODO: capture images
+	    	    grabbedL, imgL = left_camera.read()
+	    	    grabbedR, imgR = right_camera.read()
+	    	    print(grabbedL,grabbedR)
+	    	    send_action(driver.step(imgL,imgR))
+	    except KeyboardInterrupt:
+	    	# TODO: maybe cleanup
+	    	left_camera.stop()
+	    	left_camera.release()
+	    	right_camera.stop()
+	    	right_camera.release()
+    else:
+    	print("Error: Unable to open both cameras")
+    	left_camera.stop()
+    	left_camera.release()
+    	right_camera.stop()
+    	right_camera.release()
 
-            send_action(driver.step())
-
-        except KeyboardInterrupt:
-            # TODO: maybe cleanup
-            break
 
     
