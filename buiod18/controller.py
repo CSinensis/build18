@@ -245,7 +245,8 @@ if __name__ == "__main__":
                 # TODO: capture images
                 grabbedL, imgL = left_camera.read()
                 grabbedR, imgR = right_camera.read()
-                print(grabbedL,grabbedR)
+                plt.imshow(imgL)
+                plt.show()
                 send_action(driver.step(imgL,imgR))
         except BaseException:
             # TODO: maybe cleanup
@@ -253,12 +254,14 @@ if __name__ == "__main__":
             left_camera.release()
             right_camera.stop()
             right_camera.release()
+            plt.close('all')
     else:
     	print("Error: Unable to open both cameras")
     	left_camera.stop()
     	left_camera.release()
     	right_camera.stop()
     	right_camera.release()
+    	plt.close('all')
 
 
 
