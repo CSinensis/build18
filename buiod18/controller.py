@@ -17,7 +17,7 @@ class Driver:
         RIGHT = 1
 
         def other(self):
-            return StrafeDir((self.value + 1) % 2)
+            return Driver.StrafeDir((self.value + 1) % 2)
 
 
     class Vibe(Enum):
@@ -79,7 +79,7 @@ class Driver:
             self.state.set_vibe(Driver.Vibe.SPINNING)
             action = self.get_spin_action()
         
-        elif self.get_heading_feasibility(vest_heading):
+        elif self.get_heading_feasibility(vest_heading,imgL,imgR):
             self.state.set_vibe(Driver.Vibe.SEEKING)
             action = self.get_follow_heading_action(vest_heading)
         
@@ -205,7 +205,7 @@ class Driver:
         return np.array([0., 0., Driver.SPIN_ANG_VEL])
 
 
-def send_action():
+def send_action(actio):
     pass
     
 
@@ -239,25 +239,27 @@ if __name__ == "__main__":
     right_camera.start()
     
     if (left_camera.video_capture.isOpened() and right_camera.video_capture.isOpened()):
-	    try:
-	    	while True:
-	    	    # TODO: capture images
-	    	    grabbedL, imgL = left_camera.read()
-	    	    grabbedR, imgR = right_camera.read()
-	    	    print(grabbedL,grabbedR)
-	    	    send_action(driver.step(imgL,imgR))
-	    except KeyboardInterrupt:
-	    	# TODO: maybe cleanup
-	    	left_camera.stop()
-	    	left_camera.release()
-	    	right_camera.stop()
-	    	right_camera.release()
+        print("Both cameras opened?")
+        try:
+            while True:
+                # TODO: capture images
+                grabbedL, imgL = left_camera.read()
+                grabbedR, imgR = right_camera.read()
+                print(grabbedL,grabbedR)
+                send_action(driver.step(imgL,imgR))
+        except BaseException:
+            # TODO: maybe cleanup
+            left_camera.stop()
+            left_camera.release()
+            right_camera.stop()
+            right_camera.release()
     else:
     	print("Error: Unable to open both cameras")
     	left_camera.stop()
     	left_camera.release()
     	right_camera.stop()
     	right_camera.release()
+
 
 
     
