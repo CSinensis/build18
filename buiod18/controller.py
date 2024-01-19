@@ -15,29 +15,34 @@ class Driver:
         LEFT = 0
         RIGHT = 1
 
+        def other(self):
+            return StrafeDir((self.value + 1) % 2)
+
+
+    class Vibe(Enum):
+        SEEKING = 0
+        STRAFING = 1
+        SPINNING = 2
+
+
     class State:
 
         def __init__(self):
-            self.strafed_last_step = False
-            self.strafe_dir = None
-            self.strafe_switch_time = None
-        
-        def begin_strafe(self):
-            assert not self.strafed_last_step
-
-            self.strafed_last_step = True
-            self.strafe_dir = Driver.INIT_STRAFE_DIR
-            self.strafe_switch_time = now_ms() - Driver.STRAFE_TIMEOUT
-
-        def switch_strafe(self):
-            assert self.strafed_last_step
-
-            self.strafe_dir = \
-                Driver.StrafeDir.LEFT if self.strafe_dir == Driver.StrafeDir.RIGHT else Driver.StrafeDir.RIGHT
+            self.vibe = Driver.Vibe.SEEKING
+            self.strafe_dir = Driver.INIT_STRAFE_DIR.other()
             self.strafe_switch_time = now_ms()
 
-        def step(self, strafed):
-            self.strafed_last_step = strafed
+        def set_vibe(self, vibe):
+            if vibe == Driver.Vibe.STRAFING and self.vibe != Driver.Vibe.STRAFING:
+                self.strafe_dir = self.strafe_dir.other()
+                self.strafe_switch_time = now_ms() - Driver.STRAFE_TIMEOUT / 2
+
+            self.vibe = vibe
+
+        def switch_strafe(self):
+            # toggle strafe dir
+            self.strafe_dir = self.strafe_dir.other()
+            self.strafe_switch_time = now_ms()
 
 
     BUBBLE_RADIUS = 5
@@ -49,12 +54,7 @@ class Driver:
     SPIN_ANG_VEL = 1  # rad/s
     ANG_VEL_K_P = 1
 
-    
 
-
-
-    
-    
     def __init__(self):
         self.state = Driver.State()
         self.stereo = cv.StereoSGBM_create(
@@ -74,21 +74,22 @@ class Driver:
     def step(self, imgL, imgR):
         vest_heading = self.get_vest_heading(imgL, imgR)
 
-        strafed = False
         if vest_heading is None:
+            self.state.set_vibe(Driver.Vibe.SPINNING)
             action = self.get_spin_action()
         
         elif self.get_heading_feasibility(vest_heading):
+            self.state.set_vibe(Driver.Vibe.SEEKING)
             action = self.get_follow_heading_action(vest_heading)
         
         else:
-            action = self.get_strafe_action()
-            strafed = True
+            self.state.set_vibe(Driver.Vibe.STRAFING)
+            if self.state.strafe_switch_time >= Driver.STRAFE_TIMEOUT:
+                self.state.switch_strafe()
 
-        self.state.step(strafed)
+            action = self.get_strafe_action()
 
         return action
-
 
 
     def get_vest_heading(self, imgL, imgR):
@@ -183,14 +184,7 @@ class Driver:
             Driver.StrafeDir.RIGHT: self.get_strafe_right_action
         }
 
-        if not self.state.strafed_last_step:
-            self.state.begin_strafe()
-
-        elif now_ms() - self.state.strafe_switch_time >= Driver.STRAFE_TIMEOUT:
-            self.state.switch_strafe()
-
         return strafe_funs[self.state.strafe_dir]
-
 
     def get_strafe_left_action(self):
         return np.array([0., -Driver.STRAFE_SPEED, 0.])
