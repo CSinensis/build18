@@ -5,6 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import time
 from CSI_interface import CSI_Camera, gstreamer_pipeline
+from mecanum_drive import MecanumDriver
 
 def now_ms():
     return time.time() * 1e-3
@@ -205,13 +206,11 @@ class Driver:
         return np.array([0., 0., Driver.SPIN_ANG_VEL])
 
 
-def send_action(actio):
-    pass
-    
-
 if __name__ == "__main__":
-
+    mecanum_driver = MecanumDriver()
     driver = Driver()
+
+    #initialize left and right camera streams
     left_camera = CSI_Camera()
     left_camera.open(
         gstreamer_pipeline(
@@ -245,9 +244,9 @@ if __name__ == "__main__":
                 # TODO: capture images
                 grabbedL, imgL = left_camera.read()
                 grabbedR, imgR = right_camera.read()
-                plt.imshow(imgL)
-                plt.show()
-                send_action(driver.step(imgL,imgR))
+                # plt.imshow(imgL)
+                # plt.show()
+                mecanum_driver.send_action(driver.step(imgL,imgR))
         except BaseException:
             # TODO: maybe cleanup
             left_camera.stop()
@@ -255,13 +254,15 @@ if __name__ == "__main__":
             right_camera.stop()
             right_camera.release()
             plt.close('all')
+            mecanum_driver.zero_all()
     else:
-    	print("Error: Unable to open both cameras")
-    	left_camera.stop()
-    	left_camera.release()
-    	right_camera.stop()
-    	right_camera.release()
-    	plt.close('all')
+        print("Error: Unable to open both cameras")
+        left_camera.stop()
+        left_camera.release()
+        right_camera.stop()
+        right_camera.release()
+        plt.close('all')
+        mecanum_driver.zero_all()
 
 
 
