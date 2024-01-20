@@ -34,21 +34,22 @@ class Calibrator:
             #pdb.set_trace()
             img = cv2.imread(p, 0)
             img = cv2.resize(img, self.imageSize)
-            plt.imshow(img)
-            plt.show()
             ret, corners = cv2.findChessboardCorners(
                 img, self.cb_shape, cv2.CALIB_CB_EXHAUSTIVE)
+            img_new = cv2.drawChessboardCorners(img, (6,4), corners,ret)
+            plt.imshow(img_new)
+            plt.show()
             if ret and img.shape[::-1] == self.imageSize:
                 cv2.cornerSubPix(img, corners, (11, 11), (-1, -1), self.term)
                 return [os.path.basename(p), self.pattern_points, corners]
 
         arr_left = np.array([find_corners(p)
-                             for p in sorted(glob.glob(f"{dir}/left/1.png"))])
+                             for p in sorted(glob.glob(f"{dir}/left/*.png"))])
         
         arr_left = arr_left[arr_left != None][0]
 
         arr_right = np.array([find_corners(p)
-                              for p in sorted(glob.glob(f"{dir}/right/1.png"))])
+                              for p in sorted(glob.glob(f"{dir}/right/*.png"))])
         arr_right = arr_right[arr_right != None][0]
 
         all_names = sorted(list(set(arr_left[:, 0]) & set(arr_right[:, 0])))
@@ -90,7 +91,7 @@ class Calibrator:
                 rightCameraMatrix, rightDistortionCoefficients, rightRectification,
                 rightProjection, self.imageSize, cv2.CV_32FC1);
     
-        np.savez_compressed('calib.npz', imageSize=self.imageSize,
+        np.savez_compressed('calib_NEW.npz', imageSize=self.imageSize,
             leftMapX=leftMapX, leftMapY=leftMapY, leftROI=leftROI,
             rightMapX=rightMapX, rightMapY=rightMapY, rightROI=rightROI)
 
@@ -108,4 +109,4 @@ def main(dir, size, cb_shape, cb_size):
 
 
 if __name__ == "__main__":
-    main('./calibration_data', '1280x720', '7x5', 0.035);
+    main('./calibration_data', '960x540', '6x4', 0.035);
