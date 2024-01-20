@@ -4,20 +4,21 @@ import numpy as np
 import cv2
 import click
 import json
+import pdb
+import matplotlib.pyplot as plt
+
 from json import JSONEncoder
 #obtained ferom https://github.com/bartoszptak/Depther/blob/master/2_calibrate.pyd
 
 
-
-
 class Calibrator:
     def __init__(self, imageSize, cb_shape, cb_size):
-        self.cb_shape = tuple([int(x) for x in cb_shape.split('x')])
+        self.cb_shape = tuple(int(x) for x in cb_shape.split('x'))
         self.pattern_points = np.zeros((np.prod(self.cb_shape), 3), np.float32)
         self.pattern_points[:, :2] = np.indices(self.cb_shape).T.reshape(-1, 2)
         self.pattern_points *= cb_size
 
-        self.imageSize = tuple([int(x) for x in imageSize.split('x')])
+        self.imageSize = tuple(map(int, imageSize.split('x')))
         self.alpha = -1
 
         self.term = (cv2.TERM_CRITERIA_EPS +
@@ -30,20 +31,24 @@ class Calibrator:
         assert os.path.isdir(dir+'/left') and os.path.isdir(dir+'/right')
 
         def find_corners(p):
+            #pdb.set_trace()
             img = cv2.imread(p, 0)
             img = cv2.resize(img, self.imageSize)
+            plt.imshow(img)
+            plt.show()
             ret, corners = cv2.findChessboardCorners(
-                img, self.cb_shape, cv2.CALIB_CB_FAST_CHECK)
+                img, self.cb_shape, cv2.CALIB_CB_EXHAUSTIVE)
             if ret and img.shape[::-1] == self.imageSize:
                 cv2.cornerSubPix(img, corners, (11, 11), (-1, -1), self.term)
                 return [os.path.basename(p), self.pattern_points, corners]
 
         arr_left = np.array([find_corners(p)
-                             for p in sorted(glob.glob(f"{dir}/left/*.png"))])
+                             for p in sorted(glob.glob(f"{dir}/left/1.png"))])
+        
         arr_left = arr_left[arr_left != None][0]
 
         arr_right = np.array([find_corners(p)
-                              for p in sorted(glob.glob(f"{dir}/right/*.png"))])
+                              for p in sorted(glob.glob(f"{dir}/right/1.png"))])
         arr_right = arr_right[arr_right != None][0]
 
         all_names = sorted(list(set(arr_left[:, 0]) & set(arr_right[:, 0])))
@@ -103,4 +108,4 @@ def main(dir, size, cb_shape, cb_size):
 
 
 if __name__ == "__main__":
-    main('./testCalibImgs', '1280x720', '7x6', 0.0417);
+    main('./calibration_data', '1280x720', '7x5', 0.035);

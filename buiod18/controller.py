@@ -4,8 +4,9 @@ import cv2 as cv
 import matplotlib
 import matplotlib.pyplot as plt
 import time
+import os
 from CSI_interface import CSI_Camera, gstreamer_pipeline
-from mecanum_drive import MecanumDriver
+from mecanum_driver import MecanumDriver
 
 def now_ms():
     return time.time() * 1e-3
@@ -50,7 +51,7 @@ class Driver:
     BUBBLE_RADIUS = 5
     STRAFE_TIMEOUT = 8000
     INIT_STRAFE_DIR = StrafeDir.LEFT
-    FOV = np.radians(90)
+    FOV = np.radians(70)
     TRACKING_SPEED = 0.25  # m/s
     STRAFE_SPEED = 0.1
     SPIN_ANG_VEL = 1  # rad/s
@@ -207,7 +208,7 @@ class Driver:
 
 
 if __name__ == "__main__":
-    mecanum_driver = MecanumDriver()
+    # mecanum_driver = MecanumDriver()
     driver = Driver()
 
     #initialize left and right camera streams
@@ -217,7 +218,7 @@ if __name__ == "__main__":
             sensor_id=0,
             capture_width=1920,
             capture_height=1080,
-            flip_method=0,
+            flip_method=6,
             display_width=960,
             display_height=540,
         )
@@ -230,13 +231,13 @@ if __name__ == "__main__":
             sensor_id=1,
             capture_width=1920,
             capture_height=1080,
-            flip_method=0,
+            flip_method=6,
             display_width=960,
             display_height=540,
         )
     )
     right_camera.start()
-    
+    frame_num = 0
     if (left_camera.video_capture.isOpened() and right_camera.video_capture.isOpened()):
         print("Both cameras opened?")
         try:
@@ -244,9 +245,14 @@ if __name__ == "__main__":
                 # TODO: capture images
                 grabbedL, imgL = left_camera.read()
                 grabbedR, imgR = right_camera.read()
-                # plt.imshow(imgL)
-                # plt.show()
-                mecanum_driver.send_action(driver.step(imgL,imgR))
+                
+                path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "calibration_data")
+                cv.imwrite(os.path.join(path, 'left', f'{frame_num}.png'),imgL)
+                cv.imwrite(os.path.join(path, 'right', f'{frame_num}.png'),imgR)
+                frame_num += 1
+                plt.imshow(imgL)
+                plt.show()
+                # mecanum_driver.send_action(driver.step(imgL,imgR))
         except BaseException:
             # TODO: maybe cleanup
             left_camera.stop()
@@ -262,7 +268,7 @@ if __name__ == "__main__":
         right_camera.stop()
         right_camera.release()
         plt.close('all')
-        mecanum_driver.zero_all()
+        driver.zero_all()
 
 
 
