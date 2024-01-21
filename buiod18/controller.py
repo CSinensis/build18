@@ -3,6 +3,7 @@ from enum import Enum
 import cv2 as cv
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import time
 import os
 from CSI_interface import CSI_Camera, gstreamer_pipeline
@@ -78,14 +79,17 @@ class Driver:
         vest_heading = self.get_vest_heading(imgL, imgR)
 
         if vest_heading is None:
+            print("No vest found. Spinning...")
             self.state.set_vibe(Driver.Vibe.SPINNING)
             action = self.get_spin_action()
         
         elif self.get_heading_feasibility(vest_heading,imgL,imgR):
+            print(f"Vest found at heading {vest_heading}. Seeking...")
             self.state.set_vibe(Driver.Vibe.SEEKING)
             action = self.get_follow_heading_action(vest_heading)
         
         else:
+            print(f"Obscured vest found at heading {vest_heading}. Strafing...")
             self.state.set_vibe(Driver.Vibe.STRAFING)
             if self.state.strafe_switch_time >= Driver.STRAFE_TIMEOUT:
                 self.state.switch_strafe()
@@ -100,6 +104,8 @@ class Driver:
         centroids = []
 
         img_xlen = imgL.shape[0]
+        
+        bounds = []
 
         for img in imgs:
             hsv_img = cv.cvtColor(img, cv.COLOR_BGR2HSV)
@@ -112,11 +118,15 @@ class Driver:
             #(hMax = 50 , sMax = 255, vMax = 243)
 
             mask = cv.inRange(hsv_img, color_threshold_low, color_threshold_high)
+            plt.imshow(hsv_img)
+            plt.show()
             masked_img = cv.bitwise_and(hsv_img, hsv_img, mask=mask)
             masked_img = cv.cvtColor(masked_img, cv.COLOR_HSV2RGB)
             gray_mask = cv.cvtColor(masked_img, cv.COLOR_RGB2GRAY)
             contours,hierarchy = cv.findContours(gray_mask,cv.RETR_EXTERNAL, 
                                                  cv.CHAIN_APPROX_SIMPLE)
+                                                 
+            print(mask.shape, imgL.shape)
 
             cnt_area = []
             for i in range(len(contours)):
@@ -124,11 +134,36 @@ class Driver:
             max_ind = cnt_area.index(max(cnt_area))
 
             x,y,w,h = cv.boundingRect(contours[max_ind])
+            
+            if ((w < 10) or (h < 10)): return 
+            
+            bounds.append((x,y,w,h))
 
             centroids.append((x+w//2, y+h//2))
         centroids = np.vstack(centroids)
         
-        true_centroid = np.mean(centroids,axis=0)
+        true_centroid = np.mean(centroids,axis=1)
+        
+        #Show vest heading for debugging purposes
+        debug = True
+        if debug:
+            fig, (axL,axR) = plt.subplots(nrows=1,ncols=2)
+            axL.imshow(imgL)
+            axR.imshow(imgR)
+            def plot_patches(bound,ax):
+                x,y,w,h = bound
+                rect = patches.Rectangle((x,y),w,h,fill=False,edgecolor='red')
+                ax.add_patch(rect)
+            plot_patches(bounds[0],axL)
+            plot_patches(bounds[1],axR)
+            axL.scatter(centroids[0][0],centroids[0][1],c = 'red',marker='o')
+            axR.scatter(centroids[1][0],centroids[1][1],c = 'red',marker='o')
+            plt.show()
+            
+  
+        print(true_centroid)
+        #print(bounds)
+        
         horz_dist = (imgL.shape[0] - true_centroid[0])
 
         heading = horz_dist / img_xlen * Driver.FOV
@@ -138,7 +173,7 @@ class Driver:
 
     def get_depth_map(self, imgL, imgR):
         #load calibration parameters from file
-        calib = np.load("calib.npz")
+        calib = np.load("calib_NEW.npz")
         
         #obtain undistorted and rectified unpacked left/right images
         leftMapX = calib["leftMapX"]
@@ -180,7 +215,7 @@ class Driver:
 
 
     def get_heading_feasibility(self, heading, imgL, imgR):
-        pass
+        return True
     
     def get_strafe_action(self):
         strafe_funs = {
@@ -246,21 +281,23 @@ if __name__ == "__main__":
                 grabbedL, imgL = left_camera.read()
                 grabbedR, imgR = right_camera.read()
                 
-                path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "calibration_data")
-                cv.imwrite(os.path.join(path, 'left', f'{frame_num}.png'),imgL)
-                cv.imwrite(os.path.join(path, 'right', f'{frame_num}.png'),imgR)
-                frame_num += 1
-                plt.imshow(imgL)
-                plt.show()
-                # mecanum_driver.send_action(driver.step(imgL,imgR))
-        except BaseException:
+                #path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "calibration_data")
+                #cv.imwrite(os.path.join(path, 'left', f'{frame_num}.png'),imgL)
+                #cv.imwrite(os.path.join(path, 'right', f'{frame_num}.png'),imgR)
+                #frame_num += 1
+                #plt.imshow(imgL)
+                #plt.show()
+                driver.step(imgL,imgR)
+                #mecanum_driver.send_action(driver.step(imgL,imgR))
+        except BaseException as e:
+            print(e)
             # TODO: maybe cleanup
             left_camera.stop()
             left_camera.release()
             right_camera.stop()
             right_camera.release()
             plt.close('all')
-            mecanum_driver.zero_all()
+            #mecanum_driver.zero_all()
     else:
         print("Error: Unable to open both cameras")
         left_camera.stop()
@@ -268,7 +305,7 @@ if __name__ == "__main__":
         right_camera.stop()
         right_camera.release()
         plt.close('all')
-        driver.zero_all()
+        #mecanum_driver.zero_all()
 
 
 
